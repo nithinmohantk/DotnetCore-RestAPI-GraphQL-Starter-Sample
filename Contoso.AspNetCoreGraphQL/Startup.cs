@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Contoso.AspNetCoreGraphQL.Models;
+using Contoso.AspNetCoreGraphQL.GraphQL;
 
 namespace Contoso.AspNetCoreGraphQL
 {
@@ -26,15 +27,30 @@ namespace Contoso.AspNetCoreGraphQL
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-           
-            //...
-            services.AddDbContext<AppHotelDbContext>(options => options.UseSqlServer(AppHotelDbContext.DbConnectionString)); services.AddTransient<ReservationRepository>();
-            //...
+            // Database context
+            services.AddDbContext<AppHotelDbContext>(options => 
+                options.UseSqlServer(AppHotelDbContext.DbConnectionString));
+            
+            // Repository
+            services.AddTransient<ReservationRepository>();
+            
+            // AutoMapper
+            services.AddAutoMapper(typeof(Startup));
+            
+            // Controllers
             services.AddControllersWithViews();
-            // In production, the Angular files will be served from this directory
+            
+            // GraphQL
+            services
+                .AddGraphQLServer()
+                .AddQueryType<Query>()
+                .AddTypeExtension<ReservationQueries>()
+                .AddMutationType<Mutation>();
+            
+            // In production, the React files will be served from this directory
             services.AddSpaStaticFiles(configuration =>
             {
-                configuration.RootPath = "ClientApp/dist";
+                configuration.RootPath = "ClientApp/build";
             });
         }
 
@@ -66,20 +82,21 @@ namespace Contoso.AspNetCoreGraphQL
                 endpoints.MapControllerRoute(
                     name: "default",
                     pattern: "{controller}/{action=Index}/{id?}");
+                    
+                // GraphQL endpoint
+                endpoints.MapGraphQL();
             });
 
             app.UseSpa(spa =>
             {
-                // To learn more about options for serving an Angular SPA from ASP.NET Core,
-                // see https://go.microsoft.com/fwlink/?linkid=864501
-
                 spa.Options.SourcePath = "ClientApp";
 
                 if (env.IsDevelopment())
                 {
-                    spa.UseAngularCliServer(npmScript: "start");
+                    spa.UseProxyToSpaDevelopmentServer("http://localhost:3000");
                 }
             });
+            
             InitializeMapper();
         }
         /// <summary>Initializes the mapper.</summary>
